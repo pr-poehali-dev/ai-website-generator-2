@@ -22,6 +22,12 @@ interface User {
   created_at: string;
   last_login: string | null;
   projects_count?: number;
+  subscription?: {
+    plan_type: string;
+    tokens_balance: number;
+    tokens_used: number;
+    expires_at: string | null;
+  };
 }
 
 const AdminUsersPanel = ({ currentUser, onClose }: AdminUsersPanelProps) => {
@@ -29,8 +35,14 @@ const AdminUsersPanel = ({ currentUser, onClose }: AdminUsersPanelProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState<string>('all');
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [newPlanType, setNewPlanType] = useState<string>('light');
+  const [newTokens, setNewTokens] = useState<number>(0);
+  const [expiresInDays, setExpiresInDays] = useState<number>(30);
 
   const PROJECTS_URL = 'https://functions.poehali.dev/4ef398d9-5866-48b8-bb87-02031e02a875';
+  const PAYMENT_URL = 'https://functions.poehali.dev/5115d138-6d8d-4005-9614-0f7ca0ff4245';
 
   useEffect(() => {
     loadUsers();
@@ -91,6 +103,92 @@ const AdminUsersPanel = ({ currentUser, onClose }: AdminUsersPanelProps) => {
     } catch (error) {
       console.error('Error deleting user:', error);
       toast.error('Ошибка удаления пользователя');
+    }
+  };
+
+  const loadUserSubscription = async (userId: number) => {
+    try {
+      const response = await fetch(`${PAYMENT_URL}?action=admin_get_subscription&user_id=${userId}`, {
+        headers: { 'X-User-Id': currentUser.id.toString() }
+      });
+      const data = await response.json();
+      
+      if (data.has_subscription) {
+        return data.subscription;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error loading subscription:', error);
+      return null;
+    }
+  };
+
+  const grantSubscription = async () => {
+    if (!selectedUser) return;
+    
+    try {
+      const response = await fetch(`${PAYMENT_URL}?action=admin_grant_subscription`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': currentUser.id.toString()
+        },
+        body: JSON.stringify({
+          user_id: selectedUser.id,
+          plan_type: newPlanType,
+          expires_in_days: expiresInDays
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Ошибка выдачи подписки');
+      }
+      
+      toast.success(`Подписка ${newPlanType === 'light' ? 'Light' : 'Pro'} выдана пользователю ${selectedUser.name}`);
+      setShowSubscriptionModal(false);
+      setSelectedUser(null);
+      loadUsers();
+    } catch (error) {
+      console.error('Error granting subscription:', error);
+      toast.error(error instanceof Error ? error.message : 'Ошибка выдачи подписки');
+    }
+  };
+
+  const grantTokens = async () => {
+    if (!selectedUser || newTokens <= 0) {
+      toast.error('Укажите корректное количество токенов');
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${PAYMENT_URL}?action=admin_grant_tokens`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': currentUser.id.toString()
+        },
+        body: JSON.stringify({
+          user_id: selectedUser.id,
+          tokens: newTokens
+        })
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Ошибка выдачи токенов');
+      }
+      
+      toast.success(`${newTokens.toLocaleString()} токенов выдано пользователю ${selectedUser.name}`);
+      setShowSubscriptionModal(false);
+      setSelectedUser(null);
+      setNewTokens(0);
+      loadUsers();
+    } catch (error) {
+      console.error('Error granting tokens:', error);
+      toast.error(error instanceof Error ? error.message : 'Ошибка выдачи токенов');
     }
   };
 
@@ -325,6 +423,19 @@ const AdminUsersPanel = ({ currentUser, onClose }: AdminUsersPanelProps) => {
                         </div>
 
                         <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            const subscription = await loadUserSubscription(user.id);
+                            setSelectedUser({ ...user, subscription });
+                            setShowSubscriptionModal(true);
+                          }}
+                        >
+                          <Icon name="CreditCard" className="mr-1" size={14} />
+                          Подписка
+                        </Button>
+
+                        <Button
                           variant="ghost"
                           size="icon"
                           className="text-red-600 hover:text-red-700 hover:bg-red-50"
@@ -371,6 +482,173 @@ const AdminUsersPanel = ({ currentUser, onClose }: AdminUsersPanelProps) => {
           </div>
         </ScrollArea>
       </div>
+
+      {showSubscriptionModal && selectedUser && (
+        <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4">
+          <Card className="w-full max-w-2xl glass-effect p-8 animate-scale-in">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold mb-1">Управление подпиской</h2>
+                <p className="text-sm text-muted-foreground">
+                  Пользователь: <span className="font-medium">{selectedUser.name}</span> ({selectedUser.email})
+                </p>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => {
+                setShowSubscriptionModal(false);
+                setSelectedUser(null);
+              }}>
+                <Icon name="X" size={20} />
+              </Button>
+            </div>
+
+            {selectedUser.subscription && (
+              <Card className="p-4 mb-6 bg-blue-50 border-blue-200">
+                <h3 className="font-bold mb-2 flex items-center gap-2">
+                  <Icon name="Info" size={18} className="text-blue-600" />
+                  Текущая подписка
+                </h3>
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">План</p>
+                    <p className="font-bold">
+                      {selectedUser.subscription.plan_type === 'light' ? '💡 Light' : 
+                       selectedUser.subscription.plan_type === 'pro' ? '⭐ Pro' : '🪙 Токены'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Токены</p>
+                    <p className="font-bold">{selectedUser.subscription.tokens_balance.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Истекает</p>
+                    <p className="font-bold">
+                      {selectedUser.subscription.expires_at 
+                        ? new Date(selectedUser.subscription.expires_at).toLocaleDateString('ru-RU')
+                        : '—'}
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            <div className="space-y-6">
+              <div>
+                <h3 className="font-bold mb-4 flex items-center gap-2">
+                  <Icon name="Gift" size={18} />
+                  Выдать подписку
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <Label>План подписки</Label>
+                    <Select value={newPlanType} onValueChange={setNewPlanType}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="light">💡 Light (50,000 токенов)</SelectItem>
+                        <SelectItem value="pro">⭐ Pro (200,000 токенов)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label>Срок действия (дней)</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={expiresInDays}
+                      onChange={(e) => setExpiresInDays(parseInt(e.target.value) || 30)}
+                      className="mt-1"
+                      placeholder="30"
+                    />
+                  </div>
+                  
+                  <Button
+                    className="w-full gradient-primary text-white"
+                    onClick={grantSubscription}
+                  >
+                    <Icon name="Gift" className="mr-2" size={18} />
+                    Выдать подписку {newPlanType === 'light' ? 'Light' : 'Pro'}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="border-t pt-6">
+                <h3 className="font-bold mb-4 flex items-center gap-2">
+                  <Icon name="Coins" size={18} />
+                  Добавить токены
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <Label>Количество токенов</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={newTokens || ''}
+                      onChange={(e) => setNewTokens(parseInt(e.target.value) || 0)}
+                      className="mt-1"
+                      placeholder="1000"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Токены будут добавлены к текущему балансу пользователя
+                    </p>
+                  </div>
+                  
+                  <div className="grid grid-cols-3 gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setNewTokens(1000)}
+                    >
+                      +1,000
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setNewTokens(10000)}
+                    >
+                      +10,000
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setNewTokens(50000)}
+                    >
+                      +50,000
+                    </Button>
+                  </div>
+                  
+                  <Button
+                    className="w-full"
+                    variant="outline"
+                    onClick={grantTokens}
+                    disabled={newTokens <= 0}
+                  >
+                    <Icon name="Plus" className="mr-2" size={18} />
+                    Добавить {newTokens > 0 ? newTokens.toLocaleString() : ''} токенов
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-6 border-t">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1"
+                  onClick={() => {
+                    setShowSubscriptionModal(false);
+                    setSelectedUser(null);
+                  }}
+                >
+                  Закрыть
+                </Button>
+              </div>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 };

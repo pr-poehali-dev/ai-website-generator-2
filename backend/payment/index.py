@@ -59,7 +59,134 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if method == 'POST':
             body_data = json.loads(event.get('body', '{}'))
             
-            if action == 'create_payment':
+            if action == 'admin_grant_subscription':
+                if not user_id:
+                    return {
+                        'statusCode': 401,
+                        'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                        'body': json.dumps({'error': 'Требуется авторизация'}),
+                        'isBase64Encoded': False
+                    }
+                
+                cur.execute("SELECT role FROM users WHERE id = %s", (user_id,))
+                admin = cur.fetchone()
+                if not admin or admin['role'] != 'admin':
+                    return {
+                        'statusCode': 403,
+                        'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                        'body': json.dumps({'error': 'Доступ запрещён'}),
+                        'isBase64Encoded': False
+                    }
+                
+                target_user_id = body_data.get('user_id')
+                plan_type = body_data.get('plan_type', 'light')
+                expires_in_days = body_data.get('expires_in_days', 30)
+                
+                if not target_user_id:
+                    return {
+                        'statusCode': 400,
+                        'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                        'body': json.dumps({'error': 'Не указан user_id'}),
+                        'isBase64Encoded': False
+                    }
+                
+                expires_at = datetime.now() + timedelta(days=expires_in_days)
+                tokens = 50000 if plan_type == 'light' else 200000
+                
+                cur.execute(
+                    """
+                    INSERT INTO subscriptions (user_id, plan_type, tokens_balance, expires_at, status)
+                    VALUES (%s, %s, %s, %s, %s)
+                    RETURNING id
+                    """,
+                    (target_user_id, plan_type, tokens, expires_at, 'active')
+                )
+                subscription_id = cur.fetchone()['id']
+                conn.commit()
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps({
+                        'success': True,
+                        'subscription_id': subscription_id,
+                        'plan_type': plan_type,
+                        'tokens': tokens,
+                        'expires_at': expires_at.isoformat()
+                    }),
+                    'isBase64Encoded': False
+                }
+            
+            elif action == 'admin_grant_tokens':
+                if not user_id:
+                    return {
+                        'statusCode': 401,
+                        'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                        'body': json.dumps({'error': 'Требуется авторизация'}),
+                        'isBase64Encoded': False
+                    }
+                
+                cur.execute("SELECT role FROM users WHERE id = %s", (user_id,))
+                admin = cur.fetchone()
+                if not admin or admin['role'] != 'admin':
+                    return {
+                        'statusCode': 403,
+                        'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                        'body': json.dumps({'error': 'Доступ запрещён'}),
+                        'isBase64Encoded': False
+                    }
+                
+                target_user_id = body_data.get('user_id')
+                tokens = body_data.get('tokens', 0)
+                
+                if not target_user_id or tokens <= 0:
+                    return {
+                        'statusCode': 400,
+                        'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                        'body': json.dumps({'error': 'Неверные параметры'}),
+                        'isBase64Encoded': False
+                    }
+                
+                cur.execute(
+                    """
+                    SELECT id FROM subscriptions 
+                    WHERE user_id = %s AND status = 'active' 
+                    ORDER BY created_at DESC LIMIT 1
+                    """,
+                    (target_user_id,)
+                )
+                subscription = cur.fetchone()
+                
+                if subscription:
+                    cur.execute(
+                        "UPDATE subscriptions SET tokens_balance = tokens_balance + %s WHERE id = %s",
+                        (tokens, subscription['id'])
+                    )
+                else:
+                    cur.execute(
+                        """
+                        INSERT INTO subscriptions (user_id, plan_type, tokens_balance, status)
+                        VALUES (%s, %s, %s, %s)
+                        RETURNING id
+                        """,
+                        (target_user_id, 'tokens', tokens, 'active')
+                    )
+                    subscription = {'id': cur.fetchone()['id']}
+                
+                conn.commit()
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps({
+                        'success': True,
+                        'subscription_id': subscription['id'],
+                        'tokens_added': tokens
+                    }),
+                    'isBase64Encoded': False
+                }
+            
+            elif action == 'create_payment':
                 if not user_id:
                     return {
                         'statusCode': 401,
@@ -227,7 +354,63 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 }
         
         elif method == 'GET':
-            if action == 'subscription':
+            if action == 'admin_get_subscription':
+                if not user_id:
+                    return {
+                        'statusCode': 401,
+                        'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                        'body': json.dumps({'error': 'Требуется авторизация'}),
+                        'isBase64Encoded': False
+                    }
+                
+                cur.execute("SELECT role FROM users WHERE id = %s", (user_id,))
+                admin = cur.fetchone()
+                if not admin or admin['role'] != 'admin':
+                    return {
+                        'statusCode': 403,
+                        'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                        'body': json.dumps({'error': 'Доступ запрещён'}),
+                        'isBase64Encoded': False
+                    }
+                
+                target_user_id = path_params.get('user_id')
+                if not target_user_id:
+                    return {
+                        'statusCode': 400,
+                        'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                        'body': json.dumps({'error': 'Не указан user_id'}),
+                        'isBase64Encoded': False
+                    }
+                
+                cur.execute(
+                    """
+                    SELECT * FROM subscriptions 
+                    WHERE user_id = %s AND status = 'active' 
+                    ORDER BY created_at DESC LIMIT 1
+                    """,
+                    (target_user_id,)
+                )
+                subscription = cur.fetchone()
+                
+                if subscription:
+                    return {
+                        'statusCode': 200,
+                        'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                        'body': json.dumps({
+                            'has_subscription': True,
+                            'subscription': dict(subscription)
+                        }),
+                        'isBase64Encoded': False
+                    }
+                else:
+                    return {
+                        'statusCode': 200,
+                        'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                        'body': json.dumps({'has_subscription': False}),
+                        'isBase64Encoded': False
+                    }
+            
+            elif action == 'subscription':
                 if not user_id:
                     return {
                         'statusCode': 401,
