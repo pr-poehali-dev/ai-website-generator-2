@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
 import VisualEditor from '@/components/VisualEditor';
+import AuthModal from '@/components/AuthModal';
 
 const GENERATE_URL = 'https://functions.poehali.dev/624157f9-f3b7-442a-a963-2794f8de10bc';
 const PROJECTS_URL = 'https://functions.poehali.dev/4ef398d9-5866-48b8-bb87-02031e02a875';
@@ -22,6 +23,9 @@ const Index = () => {
   const [savedProjects, setSavedProjects] = useState<any[]>([]);
   const [currentProjectId, setCurrentProjectId] = useState<number | null>(null);
   const [isLoadingProjects, setIsLoadingProjects] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -142,8 +146,34 @@ const Index = () => {
   };
 
   useEffect(() => {
+    const savedUser = localStorage.getItem('user');
+    const savedToken = localStorage.getItem('authToken');
+    
+    if (savedUser && savedToken) {
+      setCurrentUser(JSON.parse(savedUser));
+      setAuthToken(savedToken);
+    }
+    
     loadProjects();
   }, []);
+
+  const handleLogin = (user: any, token: string) => {
+    setCurrentUser(user);
+    setAuthToken(token);
+    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('authToken', token);
+    setShowAuthModal(false);
+    loadProjects();
+  };
+
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setAuthToken(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('authToken');
+    setSavedProjects([]);
+    toast.success('Вы вышли из аккаунта');
+  };
 
   const templates = [
     {
@@ -256,12 +286,29 @@ const Index = () => {
             </div>
 
             <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon">
-                <Icon name="Bell" size={20} />
-              </Button>
-              <Button className="gradient-primary text-white font-medium hover:opacity-90 transition-opacity">
-                Войти
-              </Button>
+              {currentUser ? (
+                <>
+                  <Button variant="ghost" size="icon">
+                    <Icon name="Bell" size={20} />
+                  </Button>
+                  <div className="flex items-center gap-3 px-3 py-2 glass-effect rounded-lg">
+                    <div className="w-8 h-8 gradient-primary rounded-full flex items-center justify-center text-white font-bold text-sm">
+                      {currentUser.name?.[0]?.toUpperCase() || 'U'}
+                    </div>
+                    <span className="font-medium hidden md:block">{currentUser.name}</span>
+                    <Button variant="ghost" size="sm" onClick={handleLogout}>
+                      <Icon name="LogOut" size={16} />
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <Button 
+                  className="gradient-primary text-white font-medium hover:opacity-90 transition-opacity"
+                  onClick={() => setShowAuthModal(true)}
+                >
+                  Войти
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -728,14 +775,30 @@ const Index = () => {
       {activeSection === 'profile' && (
         <main className="container mx-auto px-4 py-16 animate-fade-in">
           <div className="max-w-2xl mx-auto">
-            <Card className="glass-effect p-8">
-              <div className="text-center mb-8">
-                <div className="w-24 h-24 gradient-primary rounded-full mx-auto mb-4 flex items-center justify-center text-white text-3xl font-bold">
-                  AI
+            {!currentUser ? (
+              <Card className="glass-effect p-12 text-center">
+                <Icon name="User" className="mx-auto mb-4 text-muted-foreground" size={64} />
+                <h3 className="text-2xl font-bold mb-2">Войдите в аккаунт</h3>
+                <p className="text-muted-foreground mb-6">
+                  Чтобы получить доступ к профилю и сохранённым проектам
+                </p>
+                <Button 
+                  className="gradient-primary text-white"
+                  onClick={() => setShowAuthModal(true)}
+                >
+                  <Icon name="LogIn" className="mr-2" size={20} />
+                  Войти или зарегистрироваться
+                </Button>
+              </Card>
+            ) : (
+              <Card className="glass-effect p-8">
+                <div className="text-center mb-8">
+                  <div className="w-24 h-24 gradient-primary rounded-full mx-auto mb-4 flex items-center justify-center text-white text-3xl font-bold">
+                    {currentUser.name?.[0]?.toUpperCase() || 'U'}
+                  </div>
+                  <h2 className="text-2xl font-bold mb-2">{currentUser.name}</h2>
+                  <p className="text-muted-foreground">{currentUser.email}</p>
                 </div>
-                <h2 className="text-2xl font-bold mb-2">AI Builder User</h2>
-                <p className="text-muted-foreground">ai.builder@example.com</p>
-              </div>
 
               <div className="space-y-6">
                 <div>
@@ -773,10 +836,19 @@ const Index = () => {
                       <Icon name="Settings" className="mr-3" size={20} />
                       Настройки
                     </Button>
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start text-destructive hover:text-destructive"
+                      onClick={handleLogout}
+                    >
+                      <Icon name="LogOut" className="mr-3" size={20} />
+                      Выйти из аккаунта
+                    </Button>
                   </div>
                 </div>
               </div>
             </Card>
+            )}
           </div>
         </main>
       )}
@@ -899,6 +971,13 @@ const Index = () => {
             updateProject(newCode);
             setShowEditor(false);
           }}
+        />
+      )}
+
+      {showAuthModal && (
+        <AuthModal
+          onClose={() => setShowAuthModal(false)}
+          onSuccess={handleLogin}
         />
       )}
     </div>
