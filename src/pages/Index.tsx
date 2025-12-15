@@ -7,26 +7,51 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
 
+const BACKEND_URL = 'https://functions.poehali.dev/624157f9-f3b7-442a-a963-2794f8de10bc';
+
 const Index = () => {
   const [prompt, setPrompt] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeSection, setActiveSection] = useState('home');
   const [generatedPreview, setGeneratedPreview] = useState<string | null>(null);
+  const [generatedCode, setGeneratedCode] = useState<string | null>(null);
+  const [showCodeView, setShowCodeView] = useState(false);
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     if (!prompt.trim()) {
       toast.error('Введите описание сайта');
       return;
     }
 
     setIsGenerating(true);
+    setGeneratedCode(null);
+    setShowCodeView(false);
     toast.info('🤖 ИИ генерирует ваш сайт...');
 
-    setTimeout(() => {
+    try {
+      const response = await fetch(BACKEND_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Ошибка генерации');
+      }
+
       setGeneratedPreview(prompt);
-      setIsGenerating(false);
+      setGeneratedCode(data.code);
       toast.success('✨ Сайт успешно создан!');
-    }, 3000);
+    } catch (error) {
+      console.error('Generation error:', error);
+      toast.error(error instanceof Error ? error.message : 'Ошибка при генерации сайта');
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const templates = [
@@ -210,31 +235,70 @@ const Index = () => {
                   <div className="flex items-center justify-between mb-6">
                     <h3 className="text-xl font-bold">✨ Ваш сайт готов!</h3>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm">
-                        <Icon name="Eye" className="mr-2" size={16} />
-                        Открыть редактор
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setShowCodeView(!showCodeView)}
+                      >
+                        <Icon name={showCodeView ? "Eye" : "Code2"} className="mr-2" size={16} />
+                        {showCodeView ? 'Превью' : 'Код'}
                       </Button>
-                      <Button className="gradient-primary text-white" size="sm">
+                      <Button 
+                        className="gradient-primary text-white" 
+                        size="sm"
+                        onClick={() => {
+                          if (generatedCode) {
+                            const blob = new Blob([generatedCode], { type: 'text/html' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = 'website.html';
+                            a.click();
+                            toast.success('Сайт скачан!');
+                          }
+                        }}
+                        disabled={!generatedCode}
+                      >
                         <Icon name="Download" className="mr-2" size={16} />
-                        Экспорт
+                        Скачать HTML
                       </Button>
                     </div>
                   </div>
-                  <div className="bg-gradient-to-br from-purple-100 to-blue-100 rounded-xl p-12 border-2 border-dashed border-purple-300">
-                    <div className="text-center space-y-4">
-                      <Icon name="FileCode" size={64} className="mx-auto text-primary" />
-                      <p className="text-lg font-medium text-muted-foreground">
-                        Сгенерирован сайт: <span className="font-bold text-foreground">«{generatedPreview}»</span>
-                      </p>
-                      <div className="flex gap-2 justify-center flex-wrap">
-                        <Badge>HTML</Badge>
-                        <Badge>CSS</Badge>
-                        <Badge>JavaScript</Badge>
-                        <Badge>React</Badge>
-                        <Badge>Tailwind</Badge>
-                      </div>
+                  
+                  {showCodeView ? (
+                    <div className="bg-gray-900 rounded-xl p-6 overflow-auto max-h-[500px]">
+                      <pre className="text-sm text-green-400 font-mono">
+                        <code>{generatedCode || 'Загрузка кода...'}</code>
+                      </pre>
                     </div>
-                  </div>
+                  ) : (
+                    <>
+                      {generatedCode ? (
+                        <div className="bg-white rounded-xl border-2 border-purple-200 overflow-hidden">
+                          <iframe
+                            srcDoc={generatedCode}
+                            className="w-full h-[600px] border-0"
+                            title="Generated Website Preview"
+                            sandbox="allow-scripts"
+                          />
+                        </div>
+                      ) : (
+                        <div className="bg-gradient-to-br from-purple-100 to-blue-100 rounded-xl p-12 border-2 border-dashed border-purple-300">
+                          <div className="text-center space-y-4">
+                            <Icon name="FileCode" size={64} className="mx-auto text-primary" />
+                            <p className="text-lg font-medium text-muted-foreground">
+                              Сгенерирован сайт: <span className="font-bold text-foreground">«{generatedPreview}»</span>
+                            </p>
+                            <div className="flex gap-2 justify-center flex-wrap">
+                              <Badge>HTML</Badge>
+                              <Badge>CSS</Badge>
+                              <Badge>Tailwind</Badge>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </Card>
               </div>
             )}
