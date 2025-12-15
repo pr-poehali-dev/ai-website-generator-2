@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
+import VisualEditor from '@/components/VisualEditor';
 
 const BACKEND_URL = 'https://functions.poehali.dev/624157f9-f3b7-442a-a963-2794f8de10bc';
 
@@ -16,6 +17,7 @@ const Index = () => {
   const [generatedPreview, setGeneratedPreview] = useState<string | null>(null);
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [showCodeView, setShowCodeView] = useState(false);
+  const [showEditor, setShowEditor] = useState(false);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -238,6 +240,15 @@ const Index = () => {
                       <Button 
                         variant="outline" 
                         size="sm"
+                        onClick={() => setShowEditor(true)}
+                        disabled={!generatedCode}
+                      >
+                        <Icon name="Palette" className="mr-2" size={16} />
+                        Открыть редактор
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
                         onClick={() => setShowCodeView(!showCodeView)}
                       >
                         <Icon name={showCodeView ? "Eye" : "Code2"} className="mr-2" size={16} />
@@ -393,6 +404,119 @@ const Index = () => {
               </Card>
             ))}
           </div>
+        </main>
+      )}
+
+      {activeSection === 'editor' && (
+        <main className="container mx-auto px-4 py-16 animate-fade-in">
+          <div className="max-w-4xl mx-auto text-center mb-12">
+            <Icon name="Palette" size={64} className="mx-auto mb-6 text-primary" />
+            <h1 className="text-4xl font-bold mb-4">Визуальный редактор</h1>
+            <p className="text-lg text-muted-foreground mb-8">
+              Редактируйте элементы в режиме реального времени с drag-and-drop интерфейсом
+            </p>
+            
+            <Button
+              size="lg"
+              className="gradient-primary text-white font-semibold text-lg"
+              onClick={() => {
+                if (generatedCode) {
+                  setShowEditor(true);
+                } else {
+                  toast.info('Сначала сгенерируйте сайт на главной странице');
+                  setActiveSection('home');
+                }
+              }}
+            >
+              <Icon name="Palette" className="mr-2" size={20} />
+              {generatedCode ? 'Открыть редактор' : 'Создать сайт для редактирования'}
+            </Button>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 mb-12">
+            <Card className="glass-effect p-6">
+              <div className="w-12 h-12 gradient-primary rounded-xl flex items-center justify-center mb-4">
+                <Icon name="Move" className="text-white" size={24} />
+              </div>
+              <h3 className="font-bold text-lg mb-2">Drag & Drop</h3>
+              <p className="text-sm text-muted-foreground">
+                Перетаскивайте элементы для изменения их порядка на странице
+              </p>
+            </Card>
+            
+            <Card className="glass-effect p-6">
+              <div className="w-12 h-12 gradient-primary rounded-xl flex items-center justify-center mb-4">
+                <Icon name="Palette" className="text-white" size={24} />
+              </div>
+              <h3 className="font-bold text-lg mb-2">Визуальные стили</h3>
+              <p className="text-sm text-muted-foreground">
+                Изменяйте цвета, шрифты, отступы и другие стили через панель свойств
+              </p>
+            </Card>
+            
+            <Card className="glass-effect p-6">
+              <div className="w-12 h-12 gradient-primary rounded-xl flex items-center justify-center mb-4">
+                <Icon name="Smartphone" className="text-white" size={24} />
+              </div>
+              <h3 className="font-bold text-lg mb-2">Адаптивный дизайн</h3>
+              <p className="text-sm text-muted-foreground">
+                Проверяйте отображение на Desktop, Tablet и Mobile устройствах
+              </p>
+            </Card>
+          </div>
+
+          <Card className="glass-effect p-8">
+            <h3 className="text-2xl font-bold mb-6 text-center">Возможности редактора</h3>
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="flex gap-4">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Icon name="Plus" className="text-primary" size={20} />
+                </div>
+                <div>
+                  <h4 className="font-bold mb-1">Добавление элементов</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Заголовки, тексты, кнопки, изображения, карточки и контейнеры
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Icon name="Settings" className="text-primary" size={20} />
+                </div>
+                <div>
+                  <h4 className="font-bold mb-1">Настройка свойств</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Редактируйте содержимое, стили и параметры каждого элемента
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Icon name="Code2" className="text-primary" size={20} />
+                </div>
+                <div>
+                  <h4 className="font-bold mb-1">Просмотр кода</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Переключайтесь между визуальным и кодовым представлением
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Icon name="Save" className="text-primary" size={20} />
+                </div>
+                <div>
+                  <h4 className="font-bold mb-1">Сохранение изменений</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Экспортируйте готовый HTML-код с вашими правками
+                  </p>
+                </div>
+              </div>
+            </div>
+          </Card>
         </main>
       )}
 
@@ -605,6 +729,17 @@ const Index = () => {
           </div>
         </div>
       </footer>
+
+      {showEditor && generatedCode && (
+        <VisualEditor
+          initialCode={generatedCode}
+          onClose={() => setShowEditor(false)}
+          onSave={(newCode) => {
+            setGeneratedCode(newCode);
+            setShowEditor(false);
+          }}
+        />
+      )}
     </div>
   );
 };
