@@ -33,6 +33,8 @@ const Index = () => {
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [showAdminUsers, setShowAdminUsers] = useState(false);
   const [showSubscription, setShowSubscription] = useState(false);
+  const [subscription, setSubscription] = useState<any>(null);
+  const [isLoadingSubscription, setIsLoadingSubscription] = useState(false);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -186,6 +188,9 @@ const Index = () => {
   
   useEffect(() => {
     loadProjects();
+    if (currentUser?.id) {
+      loadSubscription();
+    }
   }, [currentUser]);
 
   const handleLogin = (user: any, token: string) => {
@@ -197,9 +202,32 @@ const Index = () => {
     loadProjects();
   };
 
+  const loadSubscription = async () => {
+    if (!currentUser?.id) return;
+    
+    setIsLoadingSubscription(true);
+    try {
+      const response = await fetch('https://functions.poehali.dev/5115d138-6d8d-4005-9614-0f7ca0ff4245?action=subscription', {
+        headers: { 'X-User-Id': currentUser.id.toString() }
+      });
+      const data = await response.json();
+      
+      if (data.has_subscription) {
+        setSubscription(data.subscription);
+      } else {
+        setSubscription(null);
+      }
+    } catch (error) {
+      console.error('Error loading subscription:', error);
+    } finally {
+      setIsLoadingSubscription(false);
+    }
+  };
+
   const handleLogout = () => {
     setCurrentUser(null);
     setAuthToken(null);
+    setSubscription(null);
     localStorage.removeItem('user');
     localStorage.removeItem('authToken');
     setSavedProjects([]);
@@ -877,6 +905,96 @@ const Index = () => {
 
               <div className="space-y-6">
                 <div>
+                  <h3 className="font-bold mb-4 flex items-center gap-2">
+                    <Icon name="CreditCard" size={20} />
+                    Подписка и токены
+                  </h3>
+                  
+                  {isLoadingSubscription ? (
+                    <div className="p-6 glass-effect rounded-xl text-center">
+                      <Icon name="Loader2" className="mx-auto animate-spin text-primary mb-2" size={32} />
+                      <p className="text-sm text-muted-foreground">Загрузка...</p>
+                    </div>
+                  ) : subscription ? (
+                    <div className="p-6 bg-gradient-to-br from-primary/20 to-secondary/20 rounded-xl border-2 border-primary/30">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-gradient-to-br from-primary to-secondary rounded-lg flex items-center justify-center">
+                            <Icon name="Sparkles" className="text-white" size={24} />
+                          </div>
+                          <div>
+                            <p className="font-bold text-lg">
+                              {subscription.plan_type === 'light' ? '💡 Light' : subscription.plan_type === 'pro' ? '⭐ Pro' : '🪙 Токены'}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Активная подписка
+                            </p>
+                          </div>
+                        </div>
+                        <Badge variant="default" className="bg-green-600">
+                          <Icon name="Check" className="mr-1" size={14} />
+                          Активна
+                        </Badge>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 mb-4">
+                        <div className="p-4 bg-white/50 rounded-lg">
+                          <p className="text-sm text-muted-foreground mb-1">Осталось токенов</p>
+                          <p className="text-2xl font-bold gradient-text">
+                            {subscription.tokens_balance.toLocaleString()}
+                          </p>
+                          <div className="mt-2 bg-gray-200 rounded-full h-2 overflow-hidden">
+                            <div 
+                              className="h-full bg-gradient-to-r from-primary to-secondary transition-all"
+                              style={{ 
+                                width: `${Math.min(100, (subscription.tokens_balance / (subscription.plan_type === 'light' ? 50000 : subscription.plan_type === 'pro' ? 200000 : subscription.tokens_balance)) * 100)}%` 
+                              }}
+                            />
+                          </div>
+                        </div>
+                        
+                        <div className="p-4 bg-white/50 rounded-lg">
+                          <p className="text-sm text-muted-foreground mb-1">Использовано</p>
+                          <p className="text-2xl font-bold text-gray-600">
+                            {subscription.tokens_used?.toLocaleString() || 0}
+                          </p>
+                          {subscription.expires_at && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              <Icon name="Calendar" className="inline mr-1" size={12} />
+                              До {new Date(subscription.expires_at).toLocaleDateString('ru-RU')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <Button 
+                        variant="outline" 
+                        className="w-full bg-white hover:bg-white/90"
+                        onClick={() => setShowSubscription(true)}
+                      >
+                        <Icon name="Plus" className="mr-2" size={18} />
+                        Купить ещё токены
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="p-8 glass-effect rounded-xl text-center border-2 border-dashed border-gray-300">
+                      <Icon name="CreditCard" className="mx-auto mb-4 text-muted-foreground" size={48} />
+                      <h4 className="font-bold text-lg mb-2">Нет активной подписки</h4>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Оформите подписку или купите токены для генерации сайтов
+                      </p>
+                      <Button 
+                        className="gradient-primary text-white"
+                        onClick={() => setShowSubscription(true)}
+                      >
+                        <Icon name="Sparkles" className="mr-2" size={18} />
+                        Оформить подписку
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <div>
                   <h3 className="font-bold mb-4">Статистика</h3>
                   <div className="grid grid-cols-3 gap-4">
                     <div className="text-center p-4 glass-effect rounded-xl">
@@ -1177,6 +1295,7 @@ const Index = () => {
         <SubscriptionModal
           currentUser={currentUser}
           onClose={() => setShowSubscription(false)}
+          onSubscriptionUpdate={loadSubscription}
         />
       )}
     </div>

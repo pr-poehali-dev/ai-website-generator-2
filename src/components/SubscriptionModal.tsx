@@ -11,9 +11,10 @@ import { toast } from 'sonner';
 interface SubscriptionModalProps {
   currentUser: any;
   onClose: () => void;
+  onSubscriptionUpdate?: () => void;
 }
 
-const SubscriptionModal = ({ currentUser, onClose }: SubscriptionModalProps) => {
+const SubscriptionModal = ({ currentUser, onClose, onSubscriptionUpdate }: SubscriptionModalProps) => {
   const [activeTab, setActiveTab] = useState<'plans' | 'tokens'>('plans');
   const [subscription, setSubscription] = useState<any>(null);
   const [payments, setPayments] = useState<any[]>([]);
@@ -91,6 +92,9 @@ const SubscriptionModal = ({ currentUser, onClose }: SubscriptionModalProps) => 
       setTimeout(() => {
         loadSubscription();
         loadPayments();
+        if (onSubscriptionUpdate) {
+          onSubscriptionUpdate();
+        }
       }, 3000);
     } catch (error) {
       console.error('Payment error:', error);
