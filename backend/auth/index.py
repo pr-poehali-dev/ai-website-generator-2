@@ -82,8 +82,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 password_hash = hash_password(password)
                 
                 cur.execute(
-                    "INSERT INTO users (email, password_hash, name) VALUES (%s, %s, %s) RETURNING id, email, name",
-                    (email, password_hash, name or email.split('@')[0])
+                    "INSERT INTO users (email, password_hash, name, role) VALUES (%s, %s, %s, %s) RETURNING id, email, name, role",
+                    (email, password_hash, name or email.split('@')[0], 'user')
                 )
                 user = cur.fetchone()
                 conn.commit()
@@ -98,7 +98,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                         'user': {
                             'id': user['id'],
                             'email': user['email'],
-                            'name': user['name']
+                            'name': user['name'],
+                            'role': user.get('role', 'user')
                         },
                         'token': token,
                         'message': 'Регистрация успешна'
@@ -121,7 +122,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 password_hash = hash_password(password)
                 
                 cur.execute(
-                    "SELECT id, email, name, avatar_url FROM users WHERE email = %s AND password_hash = %s",
+                    "SELECT id, email, name, avatar_url, role FROM users WHERE email = %s AND password_hash = %s",
                     (email, password_hash)
                 )
                 user = cur.fetchone()
@@ -151,7 +152,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                             'id': user['id'],
                             'email': user['email'],
                             'name': user['name'],
-                            'avatar_url': user['avatar_url']
+                            'avatar_url': user['avatar_url'],
+                            'role': user.get('role', 'user')
                         },
                         'token': token,
                         'message': 'Вход выполнен успешно'
@@ -182,7 +184,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     }
                 
                 cur.execute(
-                    "SELECT id, email, name, avatar_url, created_at, last_login FROM users WHERE id = %s",
+                    "SELECT id, email, name, avatar_url, role, created_at, last_login FROM users WHERE id = %s",
                     (user_id,)
                 )
                 user = cur.fetchone()

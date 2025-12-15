@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import VisualEditor from '@/components/VisualEditor';
 import AuthModal from '@/components/AuthModal';
 import AdminPanel from '@/components/AdminPanel';
+import AdminUsersPanel from '@/components/AdminUsersPanel';
 
 const GENERATE_URL = 'https://functions.poehali.dev/624157f9-f3b7-442a-a963-2794f8de10bc';
 const PROJECTS_URL = 'https://functions.poehali.dev/4ef398d9-5866-48b8-bb87-02031e02a875';
@@ -29,6 +30,7 @@ const Index = () => {
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [selectedProject, setSelectedProject] = useState<any>(null);
+  const [showAdminUsers, setShowAdminUsers] = useState(false);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -310,11 +312,30 @@ const Index = () => {
                    section === 'profile' ? 'Профиль' : 'Поддержка'}
                 </button>
               ))}
+              {currentUser?.role === 'admin' && (
+                <button
+                  onClick={() => setShowAdminUsers(true)}
+                  className="text-sm font-medium text-red-600 hover:text-red-700 transition-all flex items-center gap-1"
+                >
+                  <Icon name="Shield" size={16} />
+                  Админ
+                </button>
+              )}
             </div>
 
             <div className="flex items-center gap-3">
               {currentUser ? (
                 <>
+                  {currentUser.role === 'admin' && (
+                    <Button 
+                      variant="ghost" 
+                      size="icon"
+                      className="text-red-600 hover:text-red-700"
+                      onClick={() => setShowAdminUsers(true)}
+                    >
+                      <Icon name="Shield" size={20} />
+                    </Button>
+                  )}
                   <Button variant="ghost" size="icon">
                     <Icon name="Bell" size={20} />
                   </Button>
@@ -876,6 +897,16 @@ const Index = () => {
                 <div>
                   <h3 className="font-bold mb-4">Настройки аккаунта</h3>
                   <div className="space-y-3">
+                    {currentUser.role === 'admin' && (
+                      <Button 
+                        variant="outline" 
+                        className="w-full justify-start bg-red-50 text-red-600 hover:bg-red-100 border-red-200"
+                        onClick={() => setShowAdminUsers(true)}
+                      >
+                        <Icon name="Shield" className="mr-3" size={20} />
+                        Управление пользователями
+                      </Button>
+                    )}
                     <Button variant="outline" className="w-full justify-start">
                       <Icon name="User" className="mr-3" size={20} />
                       Редактировать профиль
@@ -1126,6 +1157,13 @@ const Index = () => {
               toast.error('Ошибка удаления проекта');
             }
           }}
+        />
+      )}
+
+      {showAdminUsers && (
+        <AdminUsersPanel
+          currentUser={currentUser}
+          onClose={() => setShowAdminUsers(false)}
         />
       )}
     </div>
