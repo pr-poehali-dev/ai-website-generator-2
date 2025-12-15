@@ -8,6 +8,7 @@ import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
 import VisualEditor from '@/components/VisualEditor';
 import AuthModal from '@/components/AuthModal';
+import AdminPanel from '@/components/AdminPanel';
 
 const GENERATE_URL = 'https://functions.poehali.dev/624157f9-f3b7-442a-a963-2794f8de10bc';
 const PROJECTS_URL = 'https://functions.poehali.dev/4ef398d9-5866-48b8-bb87-02031e02a875';
@@ -26,6 +27,8 @@ const Index = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
+  const [showAdminPanel, setShowAdminPanel] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<any>(null);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -642,6 +645,16 @@ const Index = () => {
                       >
                         <Icon name="Edit" size={16} />
                       </Button>
+                      <Button 
+                        className="gradient-primary text-white"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedProject(project);
+                          setShowAdminPanel(true);
+                        }}
+                      >
+                        <Icon name="Settings" size={16} />
+                      </Button>
                     </div>
                   </div>
                 </Card>
@@ -1017,6 +1030,102 @@ const Index = () => {
         <AuthModal
           onClose={() => setShowAuthModal(false)}
           onSuccess={handleLogin}
+        />
+      )}
+
+      {showAdminPanel && selectedProject && (
+        <AdminPanel
+          project={selectedProject}
+          onClose={() => {
+            setShowAdminPanel(false);
+            setSelectedProject(null);
+          }}
+          onSave={async (updates) => {
+            try {
+              const headers: HeadersInit = { 'Content-Type': 'application/json' };
+              if (currentUser?.id) {
+                headers['X-User-Id'] = currentUser.id.toString();
+              }
+              
+              const response = await fetch(PROJECTS_URL, {
+                method: 'PUT',
+                headers,
+                body: JSON.stringify({
+                  id: selectedProject.id,
+                  name: updates.name,
+                  description: updates.description,
+                  code: selectedProject.current_code,
+                  changes_description: 'Обновление из админ-панели'
+                })
+              });
+
+              if (!response.ok) {
+                throw new Error('Ошибка сохранения');
+              }
+
+              toast.success('✅ Изменения сохранены!');
+              loadProjects();
+            } catch (error) {
+              console.error('Save error:', error);
+              toast.error('Ошибка сохранения изменений');
+            }
+          }}
+          onPublish={async () => {
+            try {
+              const headers: HeadersInit = { 'Content-Type': 'application/json' };
+              if (currentUser?.id) {
+                headers['X-User-Id'] = currentUser.id.toString();
+              }
+              
+              const response = await fetch(PROJECTS_URL, {
+                method: 'PUT',
+                headers,
+                body: JSON.stringify({
+                  id: selectedProject.id,
+                  status: 'published',
+                  code: selectedProject.current_code,
+                  changes_description: 'Публикация проекта'
+                })
+              });
+
+              if (!response.ok) {
+                throw new Error('Ошибка публикации');
+              }
+
+              toast.success('🌐 Проект опубликован!');
+              loadProjects();
+            } catch (error) {
+              console.error('Publish error:', error);
+              toast.error('Ошибка публикации проекта');
+            }
+          }}
+          onDelete={async () => {
+            if (!confirm('Вы уверены что хотите удалить этот проект?')) return;
+            
+            try {
+              const headers: HeadersInit = { 'Content-Type': 'application/json' };
+              if (currentUser?.id) {
+                headers['X-User-Id'] = currentUser.id.toString();
+              }
+              
+              const response = await fetch(`${PROJECTS_URL}?id=${selectedProject.id}`, {
+                method: 'DELETE',
+                headers
+              });
+
+              if (!response.ok) {
+                throw new Error('Ошибка удаления');
+              }
+
+              toast.success('🗑️ Проект удалён');
+              setShowAdminPanel(false);
+              setSelectedProject(null);
+              loadProjects();
+            } catch (error) {
+              console.error('Delete error:', error);
+              toast.error('Ошибка удаления проекта');
+            }
+          }}
         />
       )}
     </div>

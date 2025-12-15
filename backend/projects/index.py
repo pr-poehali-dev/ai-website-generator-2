@@ -13,7 +13,7 @@ def get_db_connection():
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
-    API для управления проектами: создание, получение списка, обновление, получение версий
+    API для управления проектами: создание, получение списка, обновление, удаление, получение версий
     """
     method: str = event.get('httpMethod', 'GET')
     
@@ -22,7 +22,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'statusCode': 200,
             'headers': {
                 'Access-Control-Allow-Origin': '*',
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type, X-User-Id',
                 'Access-Control-Max-Age': '86400'
             },
@@ -204,6 +204,44 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'body': json.dumps({
                     'success': True,
                     'message': 'Project updated successfully'
+                }),
+                'isBase64Encoded': False
+            }
+        
+        elif method == 'DELETE':
+            params = event.get('queryStringParameters') or {}
+            project_id = params.get('id')
+            
+            if not project_id:
+                return {
+                    'statusCode': 400,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps({'error': 'Project ID is required'}),
+                    'isBase64Encoded': False
+                }
+            
+            cur.execute("SELECT * FROM projects WHERE id = %s", (project_id,))
+            project = cur.fetchone()
+            
+            if not project:
+                return {
+                    'statusCode': 404,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps({'error': 'Project not found'}),
+                    'isBase64Encoded': False
+                }
+            
+            cur.execute("DELETE FROM project_versions WHERE project_id = %s", (project_id,))
+            cur.execute("DELETE FROM projects WHERE id = %s", (project_id,))
+            
+            conn.commit()
+            
+            return {
+                'statusCode': 200,
+                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                'body': json.dumps({
+                    'success': True,
+                    'message': 'Project deleted successfully'
                 }),
                 'isBase64Encoded': False
             }
