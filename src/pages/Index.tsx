@@ -10,6 +10,7 @@ import VisualEditor from '@/components/VisualEditor';
 import AuthModal from '@/components/AuthModal';
 import AdminPanel from '@/components/AdminPanel';
 import AdminUsersPanel from '@/components/AdminUsersPanel';
+import SubscriptionModal from '@/components/SubscriptionModal';
 
 const GENERATE_URL = 'https://functions.poehali.dev/624157f9-f3b7-442a-a963-2794f8de10bc';
 const PROJECTS_URL = 'https://functions.poehali.dev/4ef398d9-5866-48b8-bb87-02031e02a875';
@@ -31,6 +32,7 @@ const Index = () => {
   const [showAdminPanel, setShowAdminPanel] = useState(false);
   const [selectedProject, setSelectedProject] = useState<any>(null);
   const [showAdminUsers, setShowAdminUsers] = useState(false);
+  const [showSubscription, setShowSubscription] = useState(false);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -911,7 +913,11 @@ const Index = () => {
                       <Icon name="User" className="mr-3" size={20} />
                       Редактировать профиль
                     </Button>
-                    <Button variant="outline" className="w-full justify-start">
+                    <Button 
+                      variant="outline" 
+                      className="w-full justify-start"
+                      onClick={() => setShowSubscription(true)}
+                    >
                       <Icon name="CreditCard" className="mr-3" size={20} />
                       Подписка и платежи
                     </Button>
@@ -1164,6 +1170,13 @@ const Index = () => {
         <AdminUsersPanel
           currentUser={currentUser}
           onClose={() => setShowAdminUsers(false)}
+        />
+      )}
+
+      {showSubscription && currentUser && (
+        <SubscriptionModal
+          currentUser={currentUser}
+          onClose={() => setShowSubscription(false)}
         />
       )}
     </div>
