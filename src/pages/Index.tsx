@@ -67,7 +67,12 @@ const Index = () => {
   const loadProjects = async () => {
     setIsLoadingProjects(true);
     try {
-      const response = await fetch(PROJECTS_URL);
+      const headers: HeadersInit = {};
+      if (currentUser?.id) {
+        headers['X-User-Id'] = currentUser.id.toString();
+      }
+      
+      const response = await fetch(PROJECTS_URL, { headers });
       const data = await response.json();
       setSavedProjects(data.projects || []);
     } catch (error) {
@@ -84,6 +89,12 @@ const Index = () => {
       return;
     }
 
+    if (!currentUser) {
+      toast.info('Войдите чтобы сохранить проект');
+      setShowAuthModal(true);
+      return;
+    }
+
     try {
       const projectData = {
         name: name || generatedPreview || 'Новый проект',
@@ -93,9 +104,14 @@ const Index = () => {
         status: 'draft'
       };
 
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser?.id) {
+        headers['X-User-Id'] = currentUser.id.toString();
+      }
+      
       const response = await fetch(PROJECTS_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(projectData)
       });
 
@@ -121,9 +137,14 @@ const Index = () => {
     }
 
     try {
+      const headers: HeadersInit = { 'Content-Type': 'application/json' };
+      if (currentUser?.id) {
+        headers['X-User-Id'] = currentUser.id.toString();
+      }
+      
       const response = await fetch(PROJECTS_URL, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           id: currentProjectId,
           code: updatedCode,
@@ -150,12 +171,15 @@ const Index = () => {
     const savedToken = localStorage.getItem('authToken');
     
     if (savedUser && savedToken) {
-      setCurrentUser(JSON.parse(savedUser));
+      const user = JSON.parse(savedUser);
+      setCurrentUser(user);
       setAuthToken(savedToken);
     }
-    
-    loadProjects();
   }, []);
+  
+  useEffect(() => {
+    loadProjects();
+  }, [currentUser]);
 
   const handleLogin = (user: any, token: string) => {
     setCurrentUser(user);
@@ -541,6 +565,21 @@ const Index = () => {
               <Icon name="Loader2" className="mx-auto animate-spin text-primary mb-4" size={48} />
               <p className="text-muted-foreground">Загрузка проектов...</p>
             </div>
+          ) : !currentUser ? (
+            <Card className="glass-effect p-12 text-center">
+              <Icon name="Lock" className="mx-auto mb-4 text-muted-foreground" size={64} />
+              <h3 className="text-xl font-bold mb-2">Войдите чтобы увидеть проекты</h3>
+              <p className="text-muted-foreground mb-6">
+                Ваши сохранённые проекты будут доступны после входа
+              </p>
+              <Button 
+                className="gradient-primary text-white"
+                onClick={() => setShowAuthModal(true)}
+              >
+                <Icon name="LogIn" className="mr-2" size={20} />
+                Войти или зарегистрироваться
+              </Button>
+            </Card>
           ) : savedProjects.length === 0 ? (
             <Card className="glass-effect p-12 text-center">
               <Icon name="FolderOpen" className="mx-auto mb-4 text-muted-foreground" size={64} />

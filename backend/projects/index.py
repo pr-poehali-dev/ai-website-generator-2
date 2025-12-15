@@ -23,7 +23,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             'headers': {
                 'Access-Control-Allow-Origin': '*',
                 'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type',
+                'Access-Control-Allow-Headers': 'Content-Type, X-User-Id',
                 'Access-Control-Max-Age': '86400'
             },
             'body': '',
@@ -33,6 +33,9 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     try:
         conn = get_db_connection()
         cur = conn.cursor()
+        
+        headers = event.get('headers') or {}
+        user_id = headers.get('X-User-Id') or headers.get('x-user-id')
         
         if method == 'GET':
             params = event.get('queryStringParameters') or {}
@@ -74,9 +77,15 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                     'isBase64Encoded': False
                 }
             else:
-                cur.execute(
-                    "SELECT id, name, description, prompt, status, thumbnail_url, created_at, updated_at FROM projects ORDER BY updated_at DESC LIMIT 50"
-                )
+                if user_id:
+                    cur.execute(
+                        "SELECT id, name, description, prompt, status, thumbnail_url, created_at, updated_at FROM projects WHERE user_id = %s ORDER BY updated_at DESC LIMIT 50",
+                        (user_id,)
+                    )
+                else:
+                    cur.execute(
+                        "SELECT id, name, description, prompt, status, thumbnail_url, created_at, updated_at FROM projects WHERE user_id IS NULL ORDER BY updated_at DESC LIMIT 50"
+                    )
                 projects = cur.fetchall()
                 
                 result = []
@@ -104,11 +113,11 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             
             cur.execute(
                 """
-                INSERT INTO projects (name, description, prompt, current_code, status)
-                VALUES (%s, %s, %s, %s, %s)
+                INSERT INTO projects (name, description, prompt, current_code, status, user_id)
+                VALUES (%s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
-                (name, description, prompt, code, status)
+                (name, description, prompt, code, status, user_id)
             )
             
             project_id = cur.fetchone()['id']
