@@ -1,0 +1,37 @@
+{
+  "tests": [
+    {
+      "name": "OPTIONS request",
+      "method": "OPTIONS",
+      "path": "/",
+      "expectedStatus": 200
+    },
+    {
+      "name": "Get all projects (empty list)",
+      "method": "GET",
+      "path": "/",
+      "expectedStatus": 200,
+      "expectedBody": {
+        "projects": []
+      },
+      "bodyMatcher": "partial"
+    },
+    {
+      "name": "Create new project",
+      "method": "POST",
+      "path": "/",
+      "body": {
+        "name": "Test Project",
+        "description": "Test description",
+        "prompt": "Test prompt",
+        "code": "<html><body>Test</body></html>"
+      },
+      "expectedStatus": 201,
+      "expectedBody": {
+        "success": true,
+        "project_id": "number"
+      },
+      "bodyMatcher": "partial"
+    }
+  ]
+}

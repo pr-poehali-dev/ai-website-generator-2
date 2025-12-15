@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -8,7 +8,8 @@ import Icon from '@/components/ui/icon';
 import { toast } from 'sonner';
 import VisualEditor from '@/components/VisualEditor';
 
-const BACKEND_URL = 'https://functions.poehali.dev/624157f9-f3b7-442a-a963-2794f8de10bc';
+const GENERATE_URL = 'https://functions.poehali.dev/624157f9-f3b7-442a-a963-2794f8de10bc';
+const PROJECTS_URL = 'https://functions.poehali.dev/4ef398d9-5866-48b8-bb87-02031e02a875';
 
 const Index = () => {
   const [prompt, setPrompt] = useState('');
@@ -18,6 +19,9 @@ const Index = () => {
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [showCodeView, setShowCodeView] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
+  const [savedProjects, setSavedProjects] = useState<any[]>([]);
+  const [currentProjectId, setCurrentProjectId] = useState<number | null>(null);
+  const [isLoadingProjects, setIsLoadingProjects] = useState(false);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -31,7 +35,7 @@ const Index = () => {
     toast.info('🤖 ИИ генерирует ваш сайт...');
 
     try {
-      const response = await fetch(BACKEND_URL, {
+      const response = await fetch(GENERATE_URL, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -55,6 +59,91 @@ const Index = () => {
       setIsGenerating(false);
     }
   };
+
+  const loadProjects = async () => {
+    setIsLoadingProjects(true);
+    try {
+      const response = await fetch(PROJECTS_URL);
+      const data = await response.json();
+      setSavedProjects(data.projects || []);
+    } catch (error) {
+      console.error('Error loading projects:', error);
+      toast.error('Ошибка загрузки проектов');
+    } finally {
+      setIsLoadingProjects(false);
+    }
+  };
+
+  const saveProject = async (name?: string, description?: string) => {
+    if (!generatedCode) {
+      toast.error('Нет кода для сохранения');
+      return;
+    }
+
+    try {
+      const projectData = {
+        name: name || generatedPreview || 'Новый проект',
+        description: description || `Сайт: ${generatedPreview}`,
+        prompt: generatedPreview || '',
+        code: generatedCode,
+        status: 'draft'
+      };
+
+      const response = await fetch(PROJECTS_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(projectData)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Ошибка сохранения');
+      }
+
+      setCurrentProjectId(data.project_id);
+      toast.success('✅ Проект сохранён!');
+      loadProjects();
+    } catch (error) {
+      console.error('Save error:', error);
+      toast.error(error instanceof Error ? error.message : 'Ошибка сохранения проекта');
+    }
+  };
+
+  const updateProject = async (updatedCode: string, changesDescription?: string) => {
+    if (!currentProjectId) {
+      await saveProject();
+      return;
+    }
+
+    try {
+      const response = await fetch(PROJECTS_URL, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: currentProjectId,
+          code: updatedCode,
+          changes_description: changesDescription || 'Обновление из редактора'
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Ошибка обновления');
+      }
+
+      toast.success('✅ Изменения сохранены!');
+      loadProjects();
+    } catch (error) {
+      console.error('Update error:', error);
+      toast.error(error instanceof Error ? error.message : 'Ошибка обновления проекта');
+    }
+  };
+
+  useEffect(() => {
+    loadProjects();
+  }, []);
 
   const templates = [
     {
@@ -255,6 +344,15 @@ const Index = () => {
                         {showCodeView ? 'Превью' : 'Код'}
                       </Button>
                       <Button 
+                        variant="outline"
+                        size="sm"
+                        onClick={() => saveProject()}
+                        disabled={!generatedCode}
+                      >
+                        <Icon name="Save" className="mr-2" size={16} />
+                        Сохранить
+                      </Button>
+                      <Button 
                         className="gradient-primary text-white" 
                         size="sm"
                         onClick={() => {
@@ -372,38 +470,98 @@ const Index = () => {
               <h1 className="text-4xl font-bold mb-2">Мои проекты</h1>
               <p className="text-muted-foreground">Управляйте своими сайтами</p>
             </div>
-            <Button className="gradient-primary text-white font-medium">
-              <Icon name="Plus" className="mr-2" size={20} />
-              Новый проект
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline"
+                onClick={loadProjects}
+                disabled={isLoadingProjects}
+              >
+                <Icon name={isLoadingProjects ? "Loader2" : "RefreshCw"} className={`mr-2 ${isLoadingProjects ? 'animate-spin' : ''}`} size={20} />
+                Обновить
+              </Button>
+              <Button 
+                className="gradient-primary text-white font-medium"
+                onClick={() => setActiveSection('home')}
+              >
+                <Icon name="Plus" className="mr-2" size={20} />
+                Новый проект
+              </Button>
+            </div>
           </div>
 
-          <div className="grid gap-4">
-            {projects.map((project) => (
-              <Card key={project.id} className="glass-effect p-6 hover:scale-[1.02] transition-transform cursor-pointer">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 gradient-primary rounded-xl flex items-center justify-center text-white font-bold text-2xl">
-                      {project.name[0]}
+          {isLoadingProjects ? (
+            <div className="text-center py-12">
+              <Icon name="Loader2" className="mx-auto animate-spin text-primary mb-4" size={48} />
+              <p className="text-muted-foreground">Загрузка проектов...</p>
+            </div>
+          ) : savedProjects.length === 0 ? (
+            <Card className="glass-effect p-12 text-center">
+              <Icon name="FolderOpen" className="mx-auto mb-4 text-muted-foreground" size={64} />
+              <h3 className="text-xl font-bold mb-2">Нет сохранённых проектов</h3>
+              <p className="text-muted-foreground mb-6">
+                Создайте свой первый сайт с помощью AI
+              </p>
+              <Button 
+                className="gradient-primary text-white"
+                onClick={() => setActiveSection('home')}
+              >
+                <Icon name="Sparkles" className="mr-2" size={20} />
+                Создать сайт
+              </Button>
+            </Card>
+          ) : (
+            <div className="grid gap-4">
+              {savedProjects.map((project) => (
+                <Card key={project.id} className="glass-effect p-6 hover:scale-[1.02] transition-transform cursor-pointer">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-16 h-16 gradient-primary rounded-xl flex items-center justify-center text-white font-bold text-2xl">
+                        {project.name[0]}
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-lg mb-1">{project.name}</h3>
+                        <p className="text-sm text-muted-foreground">{project.description}</p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {new Date(project.updated_at).toLocaleDateString('ru-RU', {
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <h3 className="font-bold text-lg mb-1">{project.name}</h3>
-                      <p className="text-sm text-muted-foreground">{project.description}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{project.date}</p>
+                    <div className="flex items-center gap-3">
+                      <Badge variant={project.status === 'published' ? 'default' : 'secondary'}>
+                        {project.status === 'published' ? '🌐 Опубликован' : '📝 Черновик'}
+                      </Badge>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={async () => {
+                          try {
+                            const response = await fetch(`${PROJECTS_URL}?id=${project.id}`);
+                            const data = await response.json();
+                            if (data.current_code) {
+                              setGeneratedCode(data.current_code);
+                              setGeneratedPreview(data.name);
+                              setCurrentProjectId(data.id);
+                              setShowEditor(true);
+                            }
+                          } catch (error) {
+                            toast.error('Ошибка загрузки проекта');
+                          }
+                        }}
+                      >
+                        <Icon name="Edit" size={16} />
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <Badge variant={project.status === 'published' ? 'default' : 'secondary'}>
-                      {project.status === 'published' ? '🌐 Опубликован' : '📝 Черновик'}
-                    </Badge>
-                    <Button variant="ghost" size="icon">
-                      <Icon name="MoreVertical" size={20} />
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            ))}
-          </div>
+                </Card>
+              ))}
+            </div>
+          )}
         </main>
       )}
 
@@ -584,15 +742,17 @@ const Index = () => {
                   <h3 className="font-bold mb-4">Статистика</h3>
                   <div className="grid grid-cols-3 gap-4">
                     <div className="text-center p-4 glass-effect rounded-xl">
-                      <div className="text-3xl font-bold gradient-text">12</div>
+                      <div className="text-3xl font-bold gradient-text">{savedProjects.length}</div>
                       <div className="text-sm text-muted-foreground mt-1">Проектов</div>
                     </div>
                     <div className="text-center p-4 glass-effect rounded-xl">
-                      <div className="text-3xl font-bold gradient-text">47</div>
+                      <div className="text-3xl font-bold gradient-text">{savedProjects.length}</div>
                       <div className="text-sm text-muted-foreground mt-1">Генераций</div>
                     </div>
                     <div className="text-center p-4 glass-effect rounded-xl">
-                      <div className="text-3xl font-bold gradient-text">5</div>
+                      <div className="text-3xl font-bold gradient-text">
+                        {savedProjects.filter(p => p.status === 'published').length}
+                      </div>
                       <div className="text-sm text-muted-foreground mt-1">Опубликовано</div>
                     </div>
                   </div>
@@ -736,6 +896,7 @@ const Index = () => {
           onClose={() => setShowEditor(false)}
           onSave={(newCode) => {
             setGeneratedCode(newCode);
+            updateProject(newCode);
             setShowEditor(false);
           }}
         />
