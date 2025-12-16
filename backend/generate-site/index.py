@@ -4,7 +4,7 @@ from typing import Dict, Any
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
-    Генерация HTML/CSS/JS кода сайта из текстового описания через OpenAI GPT-4
+    Генерация HTML/CSS/JS кода сайта из текстового описания через DeepSeek V3
     """
     method: str = event.get('httpMethod', 'GET')
     
@@ -41,15 +41,15 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'isBase64Encoded': False
             }
         
-        import openai
+        from openai import OpenAI
         
-        openai.api_key = os.environ.get('OPENAI_API_KEY')
+        deepseek_api_key = os.environ.get('DEEPSEEK_API_KEY')
         
-        if not openai.api_key:
+        if not deepseek_api_key:
             return {
                 'statusCode': 500,
                 'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
-                'body': json.dumps({'error': 'OpenAI API key not configured'}),
+                'body': json.dumps({'error': 'DeepSeek API key not configured'}),
                 'isBase64Encoded': False
             }
         
@@ -66,10 +66,13 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
 Верни только готовый HTML код без объяснений."""
 
-        client = openai.OpenAI(api_key=openai.api_key)
+        client = OpenAI(
+            api_key=deepseek_api_key,
+            base_url="https://api.deepseek.com"
+        )
         
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="deepseek-chat",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Создай сайт: {prompt}"}
@@ -99,7 +102,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'success': True,
                 'code': generated_code,
                 'prompt': prompt,
-                'model': 'gpt-4o-mini'
+                'model': 'deepseek-chat'
             }),
             'isBase64Encoded': False
         }
