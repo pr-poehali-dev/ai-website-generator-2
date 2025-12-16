@@ -41,6 +41,7 @@ interface SiteSettings {
   borderRadius: number;
   animations: boolean;
   darkMode: boolean;
+  aiProvider: 'openai' | 'deepseek';
 }
 
 const AdminPanel = ({ project, onClose, onSave, onPublish, onDelete }: AdminPanelProps) => {
@@ -58,7 +59,8 @@ const AdminPanel = ({ project, onClose, onSave, onPublish, onDelete }: AdminPane
     fontSize: 16,
     borderRadius: 8,
     animations: true,
-    darkMode: false
+    darkMode: false,
+    aiProvider: 'deepseek'
   });
 
   const [sections, setSections] = useState<PageSection[]>([
@@ -207,6 +209,14 @@ const AdminPanel = ({ project, onClose, onSave, onPublish, onDelete }: AdminPane
               >
                 <Icon name="Download" className="mr-2" size={18} />
                 Экспорт
+              </Button>
+              <Button
+                variant={activeTab === 'ai' ? 'default' : 'ghost'}
+                className="w-full justify-start"
+                onClick={() => setActiveTab('ai')}
+              >
+                <Icon name="Brain" className="mr-2" size={18} />
+                AI Настройки
               </Button>
             </div>
           </div>
@@ -687,6 +697,111 @@ const AdminPanel = ({ project, onClose, onSave, onPublish, onDelete }: AdminPane
                         </span>
                       </div>
                     ))}
+                  </div>
+                </Card>
+              </div>
+            )}
+
+            {activeTab === 'ai' && (
+              <div className="space-y-6 animate-fade-in">
+                <div>
+                  <h3 className="text-2xl font-bold mb-2">AI Настройки</h3>
+                  <p className="text-muted-foreground">Выберите AI-провайдера для генерации кода</p>
+                </div>
+
+                <Card className="p-6">
+                  <div className="space-y-6">
+                    <div>
+                      <Label className="text-base font-semibold">Выбор AI-провайдера</Label>
+                      <p className="text-sm text-muted-foreground mt-1 mb-4">
+                        Выберите, какую модель использовать для генерации кода сайтов
+                      </p>
+                      
+                      <div className="space-y-3">
+                        <div 
+                          onClick={() => updateSetting('aiProvider', 'deepseek')}
+                          className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                            siteSettings.aiProvider === 'deepseek' 
+                              ? 'border-primary bg-primary/5' 
+                              : 'border-border hover:border-primary/50'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={`w-5 h-5 rounded-full border-2 mt-0.5 ${
+                              siteSettings.aiProvider === 'deepseek'
+                                ? 'border-primary bg-primary'
+                                : 'border-border'
+                            }`}>
+                              {siteSettings.aiProvider === 'deepseek' && (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <div className="w-2 h-2 bg-white rounded-full" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <div className="font-semibold text-base">DeepSeek V3</div>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Современная модель от DeepSeek. Быстрая и эффективная для веб-разработки.
+                              </p>
+                              <div className="flex gap-2 mt-2">
+                                <span className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded">Быстрая</span>
+                                <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">Экономичная</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div 
+                          onClick={() => updateSetting('aiProvider', 'openai')}
+                          className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
+                            siteSettings.aiProvider === 'openai' 
+                              ? 'border-primary bg-primary/5' 
+                              : 'border-border hover:border-primary/50'
+                          }`}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={`w-5 h-5 rounded-full border-2 mt-0.5 ${
+                              siteSettings.aiProvider === 'openai'
+                                ? 'border-primary bg-primary'
+                                : 'border-border'
+                            }`}>
+                              {siteSettings.aiProvider === 'openai' && (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <div className="w-2 h-2 bg-white rounded-full" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex-1">
+                              <div className="font-semibold text-base">OpenAI GPT-4</div>
+                              <p className="text-sm text-muted-foreground mt-1">
+                                Проверенная модель от OpenAI. Высокое качество генерации кода.
+                              </p>
+                              <div className="flex gap-2 mt-2">
+                                <span className="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded">Мощная</span>
+                                <span className="text-xs px-2 py-1 bg-orange-100 text-orange-700 rounded">Популярная</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <div className="flex gap-3">
+                        <Icon name="Info" className="text-blue-600 flex-shrink-0 mt-0.5" size={20} />
+                        <div className="text-sm">
+                          <p className="font-semibold text-blue-900 mb-1">Информация о настройке</p>
+                          <p className="text-blue-700">
+                            Для работы выбранного провайдера необходим соответствующий API-ключ.
+                            {siteSettings.aiProvider === 'deepseek' 
+                              ? ' Убедитесь, что добавлен DEEPSEEK_API_KEY в секретах проекта.'
+                              : ' Убедитесь, что добавлен OPENAI_API_KEY в секретах проекта.'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </Card>
               </div>

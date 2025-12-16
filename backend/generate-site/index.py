@@ -4,7 +4,7 @@ from typing import Dict, Any
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     """
-    Генерация HTML/CSS/JS кода сайта из текстового описания через DeepSeek V3
+    Генерация HTML/CSS/JS кода сайта из текстового описания через OpenAI или DeepSeek
     """
     method: str = event.get('httpMethod', 'GET')
     
@@ -32,6 +32,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     try:
         body_data = json.loads(event.get('body', '{}'))
         prompt = body_data.get('prompt', '').strip()
+        ai_provider = body_data.get('aiProvider', 'deepseek')
         
         if not prompt:
             return {
@@ -43,15 +44,30 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         
         from openai import OpenAI
         
-        deepseek_api_key = os.environ.get('DEEPSEEK_API_KEY')
-        
-        if not deepseek_api_key:
-            return {
-                'statusCode': 500,
-                'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
-                'body': json.dumps({'error': 'DeepSeek API key not configured'}),
-                'isBase64Encoded': False
-            }
+        if ai_provider == 'openai':
+            api_key = os.environ.get('OPENAI_API_KEY')
+            base_url = None
+            model = 'gpt-4o-mini'
+            
+            if not api_key:
+                return {
+                    'statusCode': 500,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps({'error': 'OpenAI API key not configured'}),
+                    'isBase64Encoded': False
+                }
+        else:
+            api_key = os.environ.get('DEEPSEEK_API_KEY')
+            base_url = "https://api.deepseek.com"
+            model = 'deepseek-chat'
+            
+            if not api_key:
+                return {
+                    'statusCode': 500,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps({'error': 'DeepSeek API key not configured'}),
+                    'isBase64Encoded': False
+                }
         
         system_prompt = """Ты - эксперт по веб-разработке. Создай полноценный HTML-файл сайта на основе описания пользователя.
 
@@ -66,13 +82,14 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
 Верни только готовый HTML код без объяснений."""
 
-        client = OpenAI(
-            api_key=deepseek_api_key,
-            base_url="https://api.deepseek.com"
-        )
+        client_args = {'api_key': api_key}
+        if base_url:
+            client_args['base_url'] = base_url
+        
+        client = OpenAI(**client_args)
         
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model=model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Создай сайт: {prompt}"}
@@ -102,7 +119,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 'success': True,
                 'code': generated_code,
                 'prompt': prompt,
-                'model': 'deepseek-chat'
+                'model': model,
+                'provider': ai_provider
             }),
             'isBase64Encoded': False
         }

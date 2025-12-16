@@ -35,6 +35,7 @@ const Index = () => {
   const [showSubscription, setShowSubscription] = useState(false);
   const [subscription, setSubscription] = useState<any>(null);
   const [isLoadingSubscription, setIsLoadingSubscription] = useState(false);
+  const [aiProvider, setAiProvider] = useState<'openai' | 'deepseek'>('deepseek');
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -53,7 +54,7 @@ const Index = () => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, aiProvider }),
       });
 
       const data = await response.json();
@@ -178,11 +179,16 @@ const Index = () => {
   useEffect(() => {
     const savedUser = localStorage.getItem('user');
     const savedToken = localStorage.getItem('authToken');
+    const savedAiProvider = localStorage.getItem('aiProvider') as 'openai' | 'deepseek' | null;
     
     if (savedUser && savedToken) {
       const user = JSON.parse(savedUser);
       setCurrentUser(user);
       setAuthToken(savedToken);
+    }
+    
+    if (savedAiProvider) {
+      setAiProvider(savedAiProvider);
     }
   }, []);
   
@@ -413,6 +419,23 @@ const Index = () => {
               <div className="relative">
                 <div className="absolute inset-0 gradient-primary blur-xl opacity-30 animate-pulse-slow"></div>
                 <div className="relative glass-effect rounded-2xl p-6 shadow-2xl">
+                  <div className="flex items-center justify-between mb-3">
+                    <Badge variant="outline" className="text-xs">
+                      <Icon name="Brain" className="mr-1" size={12} />
+                      AI: {aiProvider === 'openai' ? 'OpenAI GPT-4' : 'DeepSeek V3'}
+                    </Badge>
+                    <button
+                      onClick={() => {
+                        const newProvider = aiProvider === 'openai' ? 'deepseek' : 'openai';
+                        setAiProvider(newProvider);
+                        localStorage.setItem('aiProvider', newProvider);
+                        toast.success(`Переключено на ${newProvider === 'openai' ? 'OpenAI GPT-4' : 'DeepSeek V3'}`);
+                      }}
+                      className="text-xs text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      Сменить модель
+                    </button>
+                  </div>
                   <div className="flex gap-3">
                     <div className="flex-1">
                       <Input
@@ -1197,6 +1220,12 @@ const Index = () => {
           }}
           onSave={async (updates) => {
             try {
+              if (updates.settings?.aiProvider) {
+                setAiProvider(updates.settings.aiProvider);
+                localStorage.setItem('aiProvider', updates.settings.aiProvider);
+                toast.success(`AI-провайдер изменён на ${updates.settings.aiProvider === 'openai' ? 'OpenAI' : 'DeepSeek'}`);
+              }
+              
               const headers: HeadersInit = { 'Content-Type': 'application/json' };
               if (currentUser?.id) {
                 headers['X-User-Id'] = currentUser.id.toString();
