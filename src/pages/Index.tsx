@@ -327,7 +327,7 @@ const Index = () => {
               <div className="w-10 h-10 gradient-primary rounded-xl flex items-center justify-center animate-pulse-slow">
                 <Icon name="Sparkles" className="text-white" size={24} />
               </div>
-              <span className="text-2xl font-bold gradient-text">AI Site Builder</span>
+              <span className="text-2xl font-bold gradient-text">WebSynapse</span>
             </div>
 
             <div className="hidden md:flex items-center gap-6">
