@@ -5,6 +5,8 @@ import secrets
 from typing import Dict, Any, Optional
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from urllib.parse import urlencode
+import urllib.request
 
 def get_db_connection():
     """Создание подключения к базе данных"""
@@ -162,7 +164,134 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
                 }
         
         elif method == 'GET':
-            if action == 'verify':
+            if action == 'google_auth_url':
+                client_id = os.environ.get('GOOGLE_CLIENT_ID')
+                if not client_id:
+                    return {
+                        'statusCode': 500,
+                        'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                        'body': json.dumps({'error': 'Google OAuth не настроен'}),
+                        'isBase64Encoded': False
+                    }
+                
+                redirect_uri = 'https://websynapse.ru/auth/google/callback'
+                params = {
+                    'client_id': client_id,
+                    'redirect_uri': redirect_uri,
+                    'response_type': 'code',
+                    'scope': 'openid email profile',
+                    'access_type': 'offline',
+                    'prompt': 'consent'
+                }
+                
+                auth_url = f"https://accounts.google.com/o/oauth2/v2/auth?{urlencode(params)}"
+                
+                return {
+                    'statusCode': 200,
+                    'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                    'body': json.dumps({'auth_url': auth_url}),
+                    'isBase64Encoded': False
+                }
+            
+            elif action == 'google_callback':
+                code = path_params.get('code')
+                if not code:
+                    return {
+                        'statusCode': 400,
+                        'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                        'body': json.dumps({'error': 'Код авторизации не предоставлен'}),
+                        'isBase64Encoded': False
+                    }
+                
+                client_id = os.environ.get('GOOGLE_CLIENT_ID')
+                client_secret = os.environ.get('GOOGLE_CLIENT_SECRET')
+                
+                if not client_id or not client_secret:
+                    return {
+                        'statusCode': 500,
+                        'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                        'body': json.dumps({'error': 'Google OAuth не настроен'}),
+                        'isBase64Encoded': False
+                    }
+                
+                token_data = {
+                    'code': code,
+                    'client_id': client_id,
+                    'client_secret': client_secret,
+                    'redirect_uri': 'https://websynapse.ru/auth/google/callback',
+                    'grant_type': 'authorization_code'
+                }
+                
+                token_request = urllib.request.Request(
+                    'https://oauth2.googleapis.com/token',
+                    data=urlencode(token_data).encode(),
+                    headers={'Content-Type': 'application/x-www-form-urlencoded'}
+                )
+                
+                try:
+                    with urllib.request.urlopen(token_request) as response:
+                        token_response = json.loads(response.read().decode())
+                    
+                    access_token = token_response.get('access_token')
+                    
+                    userinfo_request = urllib.request.Request(
+                        'https://www.googleapis.com/oauth2/v2/userinfo',
+                        headers={'Authorization': f'Bearer {access_token}'}
+                    )
+                    
+                    with urllib.request.urlopen(userinfo_request) as response:
+                        user_info = json.loads(response.read().decode())
+                    
+                    email = user_info.get('email', '').strip().lower()
+                    name = user_info.get('name', '')
+                    avatar_url = user_info.get('picture', '')
+                    google_id = user_info.get('id', '')
+                    
+                    cur.execute("SELECT id, email, name, avatar_url, role FROM users WHERE email = %s", (email,))
+                    user = cur.fetchone()
+                    
+                    if user:
+                        cur.execute(
+                            "UPDATE users SET last_login = CURRENT_TIMESTAMP, google_id = %s, avatar_url = %s WHERE id = %s",
+                            (google_id, avatar_url, user['id'])
+                        )
+                        conn.commit()
+                    else:
+                        cur.execute(
+                            "INSERT INTO users (email, name, avatar_url, google_id, role) VALUES (%s, %s, %s, %s, %s) RETURNING id, email, name, avatar_url, role",
+                            (email, name, avatar_url, google_id, 'user')
+                        )
+                        user = cur.fetchone()
+                        conn.commit()
+                    
+                    token = generate_token()
+                    
+                    return {
+                        'statusCode': 200,
+                        'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                        'body': json.dumps({
+                            'success': True,
+                            'user': {
+                                'id': user['id'],
+                                'email': user['email'],
+                                'name': user['name'],
+                                'avatar_url': user.get('avatar_url'),
+                                'role': user.get('role', 'user')
+                            },
+                            'token': token,
+                            'message': 'Вход через Google выполнен успешно'
+                        }),
+                        'isBase64Encoded': False
+                    }
+                except Exception as google_error:
+                    return {
+                        'statusCode': 500,
+                        'headers': {'Access-Control-Allow-Origin': '*', 'Content-Type': 'application/json'},
+                        'body': json.dumps({'error': f'Ошибка авторизации Google: {str(google_error)}'}),
+                        'isBase64Encoded': False
+                    }
+            
+            elif action == 'verify':
                 headers = event.get('headers') or {}
                 token = headers.get('X-Auth-Token') or headers.get('x-auth-token')
                 
