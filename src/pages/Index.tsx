@@ -1106,7 +1106,7 @@ const Index = () => {
               <Card className="glass-effect p-6 hover:scale-105 transition-transform cursor-pointer">
                 <Icon name="Mail" className="mx-auto mb-4 text-primary" size={40} />
                 <h3 className="font-bold mb-2">Email</h3>
-                <p className="text-sm text-muted-foreground">support@aibuilder.dev</p>
+                <p className="text-sm text-muted-foreground">support@websynapse.ru</p>
               </Card>
             </div>
 
@@ -1145,7 +1145,7 @@ const Index = () => {
                 <div className="w-8 h-8 gradient-primary rounded-lg flex items-center justify-center">
                   <Icon name="Sparkles" className="text-white" size={18} />
                 </div>
-                <span className="font-bold text-lg">AI Site Builder</span>
+                <span className="font-bold text-lg">WebSynapse.ru</span>
               </div>
               <p className="text-sm text-muted-foreground">
                 Создавайте сайты будущего с помощью искусственного интеллекта
@@ -1181,7 +1181,7 @@ const Index = () => {
           </div>
           <div className="border-t border-white/20 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
             <p className="text-sm text-muted-foreground">
-              © 2024 AI Site Builder. Все права защищены.
+              © 2024 WebSynapse.ru. Все права защищены.
             </p>
             <div className="flex gap-4">
               <Icon name="Github" className="text-muted-foreground hover:text-foreground cursor-pointer transition-colors" size={20} />
