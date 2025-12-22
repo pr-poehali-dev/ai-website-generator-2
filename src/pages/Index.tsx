@@ -441,7 +441,7 @@ const Index = () => {
               <Icon name="Zap" size={16} className="mr-2" />
               Создавайте сайты с помощью ИИ
             </Badge>
-            <h1 className="text-6xl md:text-7xl font-bold mb-6 gradient-text leading-tight">
+            <h1 className="md:text-7xl font-bold mb-6 gradient-text leading-tight text-7xl py-[7px]">
               Сайт мечты
               <br />
               за минуты
